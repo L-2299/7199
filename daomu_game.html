@@ -1,0 +1,1041 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>盗墓笔记 - 像素闯关</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0a;display:flex;justify-content:center;align-items:center;font-family:'SimHei','Microsoft YaHei',sans-serif}
+#game-wrapper{position:relative;width:900px;height:640px;max-width:100vw;max-height:100vh;aspect-ratio:900/640;background:#1a1a2e;border:4px solid #4a3728;box-shadow:0 0 40px rgba(226,176,74,0.3),inset 0 0 20px rgba(0,0,0,0.5);image-rendering:pixelated;overflow:hidden}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+#ui-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+
+/* 加载页面 */
+#loading-screen{position:absolute;top:0;left:0;width:100%;height:100%;background:#0a0a0a;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:999;pointer-events:auto;color:#e2b04a;font-size:18px}
+#loading-screen .load-title{font-size:32px;font-weight:bold;margin-bottom:8px}
+#loading-screen .load-sub{font-size:14px;color:#888;margin-bottom:16px}
+#loading-screen .load-bar-outer{width:260px;height:10px;background:#1a1a2e;border:2px solid #8b6914;image-rendering:pixelated}
+#loading-screen .load-bar-inner{height:100%;width:0%;background:linear-gradient(90deg,#8b6914,#e2b04a);transition:width 0.2s;image-rendering:pixelated}
+
+/* 屏幕闪光 */
+#screen-flash{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity 0.05s;z-index:15}
+
+/* 顶部状态栏 */
+#top-bar{position:absolute;top:6px;left:6px;right:6px;display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:rgba(22,33,62,0.93);border:2px solid #4a6fa5;pointer-events:auto}
+#level-name{color:#e2b04a;font-size:17px;text-shadow:2px 2px 0 #000}
+#top-bar-right{display:flex;align-items:center;gap:8px}
+#intimacy-display{display:flex;align-items:center;gap:5px}
+#intimacy-label{color:#ff6b9d;font-size:12px}
+#intimacy-bar-outer{width:100px;height:12px;background:#2a1a2e;border:1px solid #4a3728}
+#intimacy-bar-inner{height:100%;background:linear-gradient(90deg,#ff6b9d,#ff1493);transition:width 0.5s}
+#buff-indicator{color:#e2b04a;font-size:11px;padding:1px 6px;border:1px solid #e2b04a;border-radius:2px;white-space:nowrap}
+#quit-btn{background:#2a1a2e;color:#e74c3c;border:2px solid #8b3a3a;padding:3px 8px;font-size:12px;font-family:inherit;cursor:pointer;pointer-events:auto}
+#quit-btn:hover{background:#4a2a2a;border-color:#e74c3c}
+
+/* 技能总览弹窗 */
+#skill-overview{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:630px;padding:16px 20px;background:rgba(10,10,24,0.97);border:3px solid #4a6fa5;pointer-events:auto;z-index:25}
+#skill-overview .skill-row{display:flex;gap:6px}
+.skill-card{flex:1;padding:6px 8px;background:rgba(10,10,24,0.9);border:2px solid #333;color:#ecf0f1;font-size:11px;line-height:1.6;text-align:center}
+.skill-card .sc-name{font-size:16px;font-weight:bold;display:block}
+.skill-card .sc-role{font-size:10px;color:#e2b04a;display:block}
+.skill-card .sc-s1{font-size:11px;color:#ecf0f1;margin-top:2px}
+.skill-card .sc-s2{font-size:11px;color:#aaa}
+.skill-card.zhang-s{border-color:#29ADFF}.skill-card.zhang-s .sc-name{color:#29ADFF}
+.skill-card.wang-s{border-color:#FFEC27}.skill-card.wang-s .sc-name{color:#FFEC27}
+.skill-card.wuxie-s{border-color:#00E436}.skill-card.wuxie-s .sc-name{color:#00E436}
+
+/* 底部角色面板 */
+#char-panel{position:absolute;bottom:6px;left:6px;right:6px;display:flex;gap:6px;pointer-events:auto;z-index:10}
+.char-card{flex:1;padding:5px 8px;background:rgba(22,33,62,0.93);border:2px solid #4a6fa5;color:#ecf0f1;font-size:11px;position:relative;min-height:88px}
+.char-card .name{font-size:15px;font-weight:bold}
+.char-card .stats{font-size:11px;margin:1px 0}
+.char-card .skill-tag{font-size:10px;color:#e2b04a;display:block;margin-top:1px}
+.char-card .hp-bar-outer{height:8px;background:#2a1a2e;border:1px solid #4a3728}
+.char-card .hp-bar-inner{height:100%;transition:width 0.3s}
+.char-card.dead{opacity:0.45;border-color:#e74c3c}
+.char-card.dead::after{content:'阵亡';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#e74c3c;font-size:22px;font-weight:bold;text-shadow:2px 2px 0 #000;pointer-events:none}
+.char-card.wuxie .name{color:#00E436}.char-card.wuxie .hp-bar-inner{background:#00E436}
+.char-card.zhang .name{color:#29ADFF}.char-card.zhang .hp-bar-inner{background:#29ADFF}
+.char-card.wang .name{color:#FFEC27}.char-card.wang .hp-bar-inner{background:#FFEC27}
+
+/* 道具栏 */
+#item-bar{position:absolute;bottom:150px;left:6px;right:6px;display:none;gap:6px;pointer-events:auto;justify-content:center;z-index:20}
+#item-bar button{padding:4px 10px;font-size:11px;font-family:inherit;background:#1a2a1a;color:#4eff4e;border:2px solid #2a5a2a;cursor:pointer;transition:all 0.15s}
+#item-bar button:hover{background:#2a4a2a;border-color:#4eff4e;transform:scale(1.05)}
+#item-bar button:disabled{opacity:0.3;cursor:not-allowed;transform:none}
+
+/* 对话弹窗 */
+#dialogue-box{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);width:600px;padding:14px 18px;background:rgba(10,10,20,0.96);border:3px solid #8b6914;color:#e8d5a3;font-size:15px;line-height:1.8;display:none;pointer-events:auto;text-shadow:1px 1px 0 #000;z-index:25}
+#dialogue-box .speaker{color:#e2b04a;font-size:17px}
+#dialogue-box .hint{color:#888;font-size:13px;margin-top:6px}
+
+/* 开局技能弹窗 */
+#skill-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:580px;padding:20px 24px;background:rgba(10,10,20,0.96);border:3px solid #4a6fa5;color:#ecf0f1;font-size:14px;line-height:2;display:none;pointer-events:auto;text-align:center;z-index:20}
+#skill-popup h3{color:#e2b04a;margin-bottom:10px;font-size:20px}
+#skill-popup .key-hint{display:inline-block;width:22px;height:22px;background:#e2b04a;color:#000;border-radius:3px;font-weight:bold;line-height:22px;margin:0 2px}
+#skill-popup .char-info{display:flex;justify-content:space-around;margin:10px 0;text-align:left;gap:8px}
+#skill-popup .char-info>div{flex:1;padding:8px;border:1px solid #333;font-size:12px;line-height:1.7}
+#skill-popup .char-info .cn{font-size:16px;font-weight:bold;display:block;margin-bottom:2px}
+
+/* 战斗面板 */
+#battle-panel{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);display:none;gap:5px;pointer-events:auto;flex-wrap:wrap;justify-content:center;z-index:15}
+#battle-panel button{padding:7px 11px;font-size:13px;font-family:inherit;background:#2a1a2e;color:#e2b04a;border:2px solid #8b6914;cursor:pointer;transition:all 0.15s}
+#battle-panel button:hover{background:#4a2a3e;border-color:#e2b04a;transform:scale(1.05)}
+#battle-panel button:active{transform:scale(0.95)}
+#battle-panel button:disabled{opacity:0.35;cursor:not-allowed;transform:none}
+#battle-panel button.btn-zhang{color:#29ADFF;border-color:#29ADFF}
+#battle-panel button.btn-wang{color:#FFEC27;border-color:#FFEC27}
+#battle-panel button.btn-wuxie{color:#00E436;border-color:#00E436}
+
+/* 新手引导 */
+#tutorial-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:none;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto;z-index:30;color:#ecf0f1;text-align:center;font-size:15px;line-height:2.2}
+#tutorial-overlay .tut-title{color:#e2b04a;font-size:24px;margin-bottom:12px}
+#tutorial-overlay .tut-keys{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0}
+#tutorial-overlay .tut-key{display:inline-block;padding:6px 14px;background:#2a1a2e;border:2px solid #8b6914;color:#e2b04a;font-size:14px}
+#tutorial-overlay .tut-btn{padding:10px 30px;background:#e2b04a;color:#000;border:none;font-size:18px;font-family:inherit;cursor:pointer;margin-top:16px;font-weight:bold}
+
+/* 触屏按钮 */
+#touch-controls{display:none;position:absolute;bottom:100px;left:50%;transform:translateX(-50%);pointer-events:auto;z-index:28;gap:4px}
+#touch-controls .touch-row{display:flex;gap:4px;justify-content:center;margin-bottom:4px}
+#touch-controls button{min-width:44px;min-height:44px;padding:6px 10px;font-size:13px;font-family:inherit;background:rgba(22,33,62,0.93);color:#e2b04a;border:2px solid #4a6fa5;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#touch-controls button:active{background:#4a2a3e;border-color:#e2b04a}
+#touch-controls .touch-nav{min-width:56px;font-size:16px}
+#touch-controls .touch-act{color:#ecf0f1;font-size:11px;min-width:52px}
+
+#message-toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#e2b04a;font-size:22px;pointer-events:none;text-shadow:2px 2px 0 #000;display:none;animation:toastFade 1.5s forwards;z-index:50}
+@keyframes toastFade{0%{opacity:0;transform:translate(-50%,-50%) scale(0.5)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}40%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-60%)}}
+
+#ending-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;flex-direction:column;justify-content:center;align-items:center;pointer-events:auto;color:#ecf0f1;text-align:center;z-index:40}
+#ending-overlay h2{color:#e2b04a;font-size:32px;margin-bottom:16px}
+#ending-overlay p{font-size:16px;line-height:2;max-width:500px}
+#ending-overlay .sequel{color:#e2b04a;font-size:22px;margin-top:24px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* ===== 移动端适配 ===== */
+@media(max-width:900px), (max-height:640px){
+  #game-wrapper{width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-width:2px}
+  #top-bar{padding:2px 6px;top:2px}
+  #level-name{font-size:13px}
+  #intimacy-label{font-size:9px}
+  #intimacy-bar-outer{width:50px;height:8px}
+  #quit-btn{padding:2px 5px;font-size:10px}
+  #buff-indicator{font-size:8px}
+  .char-card{min-height:62px;padding:2px 5px;font-size:9px}
+  .char-card .name{font-size:12px}
+  .char-card .stats{font-size:9px}
+  .char-card .skill-tag{font-size:8px}
+  #skill-popup{width:94%;font-size:11px;padding:12px 14px}
+  #skill-popup .char-info{flex-direction:column;gap:4px}
+  #skill-popup .char-info>div{font-size:10px}
+  #skill-overview{width:94%;padding:8px 12px}
+  #skill-overview .skill-row{flex-direction:column}
+  .skill-card{font-size:9px;padding:3px 5px}
+  .skill-card .sc-name{font-size:13px}
+  #battle-panel button{padding:4px 6px;font-size:10px}
+  #item-bar button{padding:3px 6px;font-size:9px}
+  #item-bar{bottom:162px}
+  #touch-controls{bottom:66px;display:flex;flex-direction:column;align-items:center}
+  #touch-controls button{min-width:44px;min-height:40px;padding:4px 6px;font-size:12px}
+  #touch-controls .touch-nav{min-width:52px;font-size:14px}
+  #touch-controls .touch-act{font-size:10px;min-width:48px}
+  #dialogue-box{width:92%;font-size:12px;bottom:162px}
+  #ending-overlay h2{font-size:22px}
+  #ending-overlay p{font-size:12px;max-width:90%}
+  #loading-screen .load-title{font-size:22px}
+  #loading-screen .load-sub{font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+<canvas id="game" width="900" height="640"></canvas>
+<div id="screen-flash"></div>
+<div id="ui-layer">
+  <!-- 加载画面 -->
+  <div id="loading-screen">
+    <div class="load-title">⚱ 盗墓笔记</div>
+    <div class="load-sub">像素闯关 · 铁三角的冒险</div>
+    <div class="load-bar-outer"><div class="load-bar-inner" id="load-bar"></div></div>
+    <div style="color:#888;font-size:12px;margin-top:8px" id="load-status">加载中...</div>
+  </div>
+
+
+  <!-- 顶部状态栏 -->
+  <div id="top-bar">
+    <span id="level-name">山东瓜子庙</span>
+    <div id="top-bar-right">
+      <span id="buff-indicator" style="display:none">羁绊加成: ATK+0%</span>
+      <span id="save-indicator" style="color:#4eff4e;font-size:10px;display:none">💾已保存</span>
+      <div id="intimacy-display">
+        <span id="intimacy-label">羁绊值</span>
+        <div id="intimacy-bar-outer"><div id="intimacy-bar-inner" style="width:0%"></div></div>
+        <span id="intimacy-value" style="color:#ff6b9d;font-size:12px;">0</span>
+      </div>
+      <button id="quit-btn" onclick="quitToTitle()">🚪退出</button>
+    </div>
+  </div>
+
+  <!-- 技能总览弹窗（按H键） -->
+  <div id="skill-overview">
+    <div style="color:#e2b04a;font-size:18px;text-align:center;margin-bottom:10px">📜 铁三角 · 技能总览（按H关闭）</div>
+    <div class="skill-row">
+      <div class="skill-card zhang-s">
+        <span class="sc-name">张起灵</span>
+        <span class="sc-role">全队天花板·高伤暴击+残血狂暴</span>
+        <span class="sc-s1">麒麟重斩：3×ATK超高暴击(暴击×2)</span>
+        <span class="sc-s2">麒麟血脉：残血 伤害×2 免控 CD1</span>
+      </div>
+      <div class="skill-card wang-s">
+        <span class="sc-name">王胖子</span>
+        <span class="sc-role">肉盾第二战力·范围轰炸+嘲讽</span>
+        <span class="sc-s1">炸弹：2×ATK范围群伤</span>
+        <span class="sc-s2">嘲讽：拉仇恨 怪物伤害-70%</span>
+      </div>
+      <div class="skill-card wuxie-s">
+        <span class="sc-name">吴邪</span>
+        <span class="sc-role">辅助+输出·破防增伤+常规火力</span>
+        <span class="sc-s1">机关破解：1.8×ATK+降敌防御</span>
+        <span class="sc-s2">分析：开局全队暴击↑3回合</span>
+      </div>
+    </div>
+    <div style="color:#aaa;font-size:11px;text-align:center;margin-top:8px">道具：<span style="color:#4eff4e">6.回血丹</span> <span style="color:#ff6347">7.增攻符</span> <span style="color:#6495ed">8.护盾符</span></div>
+  </div>
+
+  <!-- 新手引导弹窗 -->
+  <div id="tutorial-overlay">
+    <div class="tut-title">📖 战斗指南</div>
+    <div style="margin-bottom:6px">铁三角联手作战，按键或点击按钮释放技能</div>
+    <div class="tut-keys">
+      <span class="tut-key">⚔ 1.团队攻击</span>
+      <span class="tut-key">🔷 2.麒麟重斩</span>
+      <span class="tut-key">💣 3.炸弹</span>
+      <span class="tut-key">🔧 4.机关破解</span>
+      <span class="tut-key">🛡 5.防御</span>
+    </div>
+    <div style="font-size:12px;color:#aaa">💕 羁绊值越高全队ATK/DEF越强 | 💀 角色阵亡=完全禁用</div>
+    <div style="font-size:12px;color:#aaa">🎒 战胜掉落道具：6回血丹 7增攻符 8护盾符</div>
+    <button class="tut-btn" onclick="closeTutorial()">🚪 开始战斗！</button>
+  </div>
+
+  <!-- 角色面板 -->
+  <div id="char-panel">
+    <div class="char-card wuxie" id="card-wuxie">
+      <span class="name">吴邪</span>
+      <div class="stats">Lv.<span id="wuxie-lv">1</span> HP:<span id="wuxie-hp">120</span>/<span id="wuxie-maxhp">120</span> ATK:<span id="wuxie-atk">12</span> DEF:6</div>
+      <span class="skill-tag">🔧 机关破解 | 🔍 分析</span>
+      <div class="hp-bar-outer"><div class="hp-bar-inner" id="wuxie-bar" style="width:100%"></div></div>
+    </div>
+    <div class="char-card zhang" id="card-zhang">
+      <span class="name">张起灵</span>
+      <div class="stats">Lv.<span id="zhang-lv">1</span> HP:<span id="zhang-hp">250</span>/<span id="zhang-maxhp">250</span> ATK:<span id="zhang-atk">50</span> DEF:10</div>
+      <span class="skill-tag">🔷 麒麟重斩 | 🩸 麒麟血脉</span>
+      <div class="hp-bar-outer"><div class="hp-bar-inner" id="zhang-bar" style="width:100%"></div></div>
+    </div>
+    <div class="char-card wang" id="card-wang">
+      <span class="name">王胖子</span>
+      <div class="stats">Lv.<span id="wang-lv">1</span> HP:<span id="wang-hp">200</span>/<span id="wang-maxhp">200</span> ATK:<span id="wang-atk">35</span> DEF:18</div>
+      <span class="skill-tag">💣 炸弹 | 🛡 嘲讽</span>
+      <div class="hp-bar-outer"><div class="hp-bar-inner" id="wang-bar" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <!-- 道具栏 -->
+  <div id="item-bar">
+    <button onclick="useItem('heal')" id="btn-heal">💚 6.回血丹 <span class="item-count" id="cnt-heal">0</span></button>
+    <button onclick="useItem('atkBoost')" id="btn-atkBoost">🔥 7.增攻符 <span class="item-count" id="cnt-atkBoost">0</span></button>
+    <button onclick="useItem('shield')" id="btn-shield">🛡 8.护盾符 <span class="item-count" id="cnt-shield">0</span></button>
+  </div>
+
+  <!-- 开局技能弹窗 -->
+  <div id="skill-popup">
+    <h3>📜 铁三角 · 技能总览</h3>
+    <div class="char-info">
+      <div><span class="cn" style="color:#29ADFF">张起灵</span>全队天花板·HP250 ATK50<br>🔷 麒麟重斩：3倍ATK超高暴击<br>（暴击时再×2 = 6倍伤害）<br>🩸 麒麟血脉：HP&lt;50%自动狂暴<br>伤害×2 免控 冷却仅1回合</div>
+      <div><span class="cn" style="color:#FFEC27">王胖子</span>肉盾第二·HP200 ATK35<br>💣 炸弹：2倍ATK范围群伤<br>附带嘲讽拉仇恨减伤70%<br>🛡 防御最高(18) 团队护盾</div>
+      <div><span class="cn" style="color:#00E436">吴邪</span>辅助+输出·HP120 ATK12<br>🔧 机关破解：1.8倍ATK+降敌防3回合<br>刷新全队暴击buff<br>🔍 分析：开局全队暴击率↑3回合</div>
+    </div>
+    <div style="margin-top:10px">战斗按键：<span class="key-hint">1</span>团队攻击 <span class="key-hint">2</span>麒麟重斩 <span class="key-hint">3</span>炸弹 <span class="key-hint">4</span>机关破解 <span class="key-hint">5</span>防御</div>
+    <div style="margin-top:4px;font-size:12px">道具：<span class="key-hint">6</span>回血丹 <span class="key-hint">7</span>增攻符 <span class="key-hint">8</span>护盾符</div>
+    <div style="margin-top:6px;color:#e74c3c;font-size:12px">⚠ 角色阵亡=完全禁用 | 💕 羁绊值越高全队战力越强 | 🔥 小哥麒麟血克制尸蹩王</div>
+    <div class="hint" style="color:#e2b04a;margin-top:8px">按 空格键 开始冒险</div>
+  </div>
+
+  <!-- 触屏按钮（移动端自动显示） -->
+  <div id="touch-controls">
+    <div class="touch-row">
+      <button class="touch-nav" onclick="movePlayer(-1)">◀ 左</button>
+      <button class="touch-nav" onclick="handleInput('Enter')" style="color:#e2b04a">进入</button>
+      <button class="touch-nav" onclick="movePlayer(1)">右 ▶</button>
+      <button class="touch-nav" onclick="toggleSkillOverview()">H 技能</button>
+    </div>
+    <div class="touch-row" id="touch-battle" style="display:none">
+      <button class="touch-act" onclick="battleAction('attack')" id="tbtn-attack">⚔1攻击</button>
+      <button class="touch-act btn-zhang" onclick="battleAction('qilin')" id="tbtn-qilin">🔷2麒麟</button>
+      <button class="touch-act btn-wang" onclick="battleAction('bomb')" id="tbtn-bomb">💣3炸弹</button>
+      <button class="touch-act btn-wuxie" onclick="battleAction('crack')" id="tbtn-crack">🔧4破解</button>
+      <button class="touch-act" onclick="battleAction('defend')" id="tbtn-defend">🛡5防御</button>
+    </div>
+  </div>
+
+  <div id="dialogue-box"></div>
+
+  <div id="battle-panel">
+    <button onclick="battleAction('attack')" id="btn-attack">⚔ 1.团队攻击</button>
+    <button onclick="battleAction('qilin')" class="btn-zhang" id="btn-qilin">🔷 2.麒麟重斩</button>
+    <button onclick="battleAction('bomb')" class="btn-wang" id="btn-bomb">💣 3.炸弹</button>
+    <button onclick="battleAction('crack')" class="btn-wuxie" id="btn-crack">🔧 4.机关破解</button>
+    <button onclick="battleAction('defend')" id="btn-defend">🛡 5.防御</button>
+  </div>
+
+  <div id="message-toast"></div>
+
+  <div id="ending-overlay">
+    <h2>青铜门</h2>
+    <p>张起灵转过身，望了吴邪最后一眼<br>那眼神里有说不尽的话语<br>他转身，走进了那扇亘古的青铜巨门<br>门缓缓关闭……</p>
+    <p class="sequel">剧情暂告一段落<br>敬请期待 第二季</p>
+    <p style="color:#888;font-size:14px;margin-top:16px">按 R 键或点击按钮 重新开始冒险</p>
+    <button onclick="restartGame()" style="padding:10px 28px;font-size:16px;font-family:inherit;background:#e2b04a;color:#000;border:none;cursor:pointer;font-weight:bold;margin-top:10px;pointer-events:auto">🏠 返回主页</button>
+  </div>
+</div>
+</div>
+
+<script>
+// ===================================================================
+//  盗墓笔记 像素闯关 原著版 v2 - 移动端+存档+特效+引导
+// ===================================================================
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+const isMobile=/Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)||('ontouchstart' in window&&window.innerWidth<1024);
+
+// 移动端显示触屏按钮
+if(isMobile){document.getElementById('touch-controls').style.display='flex'}
+
+// ==================== 像素绘制 ====================
+function px(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w||4,h||4)}
+function drawSprite(d,x,y,s){
+  s=s||4;const rx=Math.round(x),ry=Math.round(y);
+  const m={'.':null,'B':'#4a3728','b':'#8b6914','F':'#ffd5b8','f':'#e8b88a','G':'#2d5a27','g':'#4a8c3f','R':'#c0392b','r':'#e74c3c','W':'#ecf0f1','w':'#bdc3c7','K':'#1a1a2e','k':'#2c3e50','Y':'#e2b04a','y':'#f39c12','P':'#8e44ad','p':'#9b59b6','C':'#2980b9','c':'#3498db','S':'#7f8c8d','s':'#95a5a6','D':'#2c3e50','d':'#34495e','O':'#e67e22','o':'#d35400','A':'#c0392b','a':'#e74c3c','M':'#8b0000','m':'#ff4500','N':'#006400','n':'#228b22','H':'#ffd700','h':'#ffec8b','T':'#654321','t':'#8b6914','L':'#4169e1','l':'#6495ed','E':'#2f4f4f','e':'#3b7a57','Z':'#191970','z':'#483d8b','Q':'#ff69b4','q':'#ffb6c1','V':'#556b2f','v':'#6b8e23','X':'#1c1c1c','x':'#3d3d3d','J':'#ff6347','j':'#ff7f50','1':'#29ADFF','2':'#FFEC27','3':'#00E436'};
+  for(let r=0;r<d.length;r++)for(let c=0;c<d[r].length;c++){const ch=d[r][c];if(!m[ch])continue;px(rx+c*s,ry+r*s,s,s,m[ch]);}
+}
+
+// ==================== 精灵数据 ====================
+const S={
+  wuxie:['....BBBB....','...BBBBBB...','...BFFFB...','...BFFFB...','...BBBBB...','...BBBBB...','..3333333..','..3.3.3.3..','..3333333..','..3.....3..','..FF...FF..','..F.....F..','....BBB.....','...B...B....','...B...B....','..B.....B..'],
+  zhang:['....KKKK....','...KKKKKK...','...KFFFK...','...KFFFK...','...KKKKK...','...KKKKK...','..1111111..','..1.1.1.1..','..1111111..','..1.....1..','..FF...FF..','..F.....F..','....KKK.....','...K...K....','...K...K....','..K.....K..'],
+  wang:['...BBBBB...','..BBBBBBB..','..BFFFBF..','..BFFFB...','..BBBBBBB..','..BBBBBBB..','.222222222.','.2.2.2.2.2.','.222222222.','.2.......2.','.FF.....FF.','.F.......F.','...BBBBB...','..B.....B..','..B.....B..','..B.....B..'],
+  jinpo:['WWWWWWWWWWWW','WFFFFFFFFFW','WFFFFFFFFFFW','WFFWWWWFFFW','WFFW..WFFFW','WFFW..WFFFW','WFFFFFFFFFFW','WFFRRRRFFFW','WFFFRRRFFFFW','WFFFFFFFFFFW','WWWWWWWWWWWW','.WWWWWWWW..','..WWWWWW....','...WWWW.....','....WW......','.....W......'],
+  haihouzi:['....GGGG....','...GGGGGG...','..GGFFFFGG..','..GFFFFFG..','..GFFFFFG..','..GGGGGGG..','..GGGGGGG..','..GGRRG..','..GGRRG..','.GGGGGGGGG.','.G.GGGGG.G.','.G.G...G.G.','.GG.....GG.','G........G','G........G','GG......GG'],
+  renmian:['....FFFF....','...FFFFFF...','..FFRRRFF..','..FRRRRRF..','..FFFFFFF..','..GGGGGGG..','.GGGGGGGGG.','.GGGGGGGGG.','..GGGGGGG..','..GYYGYYG..','..GYYGYYG..','..GGGGGGG..','...BBBBB....','...B...B....','..B.....B..','..BBBBBBB..'],
+  shibie:['....RRR.....','...RRRRR....','..RRRRRRR...','..RROORR...','.RRRRRRRRR..','.RRRRRRRRR..','.RRRRRRRRR..','..RRRRRRR...','..RRRRRRR...','...RRRRR....','..RRR.RRR...','.RR.....RR.','.R.......R.','.R.......R.','RR.......RR','R.........R'],
+  zhujiuyin:['....OOOO....','...OOOOOO...','..OOHHHHOO..','..OHHHHHHO..','..OHHHHHHO..','..OOOOOOO..','.OOOYYYOOO.','.OOOOOOOOO.','.O.OOOO.O.','..OOOOOO...','..OHHHHO...','..OHHHHO...','..O.O.O....','.O..O..O...','O...O...O..','OO.......OO'],
+  jiguanshe:['....RRRR....','...RRRRRR...','...RROORR...','...GGGGGG...','..GGGGGGGG..','..GGFFFFGG..','..GFFFFFG..','.GGGGGGGGG.','.G.GGGGG.G.','..GGGGGGG..','...GGGGG....','...G...G....','..G.....G...','.G.......G.','G.........G','G.........G'],
+  miluotuo:['....GGGG....','...GGGGGG...','..GGEEEYGG..','..GEEEEEG..','..GEEEEEG..','..GGYEYGG..','.GGGGGGGGG.','.GGEEEEEGG.','.GGEEEEEGG.','.GGEEEEEGG.','..GGEEEGG..','..GGGGGGG..','...GGGGG....','..GG...GG...','.G.......G.','GG.......GG'],
+  shibieKing:['.....RRR.....','....RRRRR....','...RRRRRRR...','..RRROORRR..','.RRRRRRRRRR.','.RRRRRRRRRR.','.RRMMRRMMRR.','.RRRRRRRRRR.','.RRRRRRRRRR.','..RRRRRRRR..','...RRRRRR...','..RRR.RRR..','.RR.....RR.','.R.......R.','RR.......RR','R.........R'],
+  wannuwang:['....PPPP....','...PPPPPP...','..PPPPPAPP..','..PPAAAPP..','.PPPPPPPPP.','.PPPPPAPPP.','.PPPPPPPPP.','..PPRRRPP..','..PPRRRPP..','.PPPRRRPPP.','.PPRRRRRPP.','..PPPPPPP..','...PPPPP....','..PP.PP.PP..','.PP..PP..PP.','PP...PP...PP'],
+  bronzeGuard:['....YYYY....','...YYYYYY...','..YYHHHHYY..','..YHHHHHY..','..YHHHHHY..','..YYYYYYY..','..YYRRRYY..','.YYYRRRYYY.','.YYYYYYYYY.','.Y.YYYY.Y.','.Y.Y..Y.Y.','.YY....YY.','..YY....YY..','..Y......Y..','..Y......Y..','..YY....YY..']
+};
+
+// ==================== 关卡数据 ====================
+const LEVELS=[
+  {id:0,name:'山东瓜子庙',terrain:'green',mapX:120,mapY:280,monster:'shibie',monsterName:'尸蹩',monsterHp:80,monsterAtk:12,story:'战国帛书出土之处，一切故事的起点。\n吴邪在瓜子庙第一次接触到了这神秘的古物，命运的齿轮开始转动。',quote:'"有些秘密，一旦知道了，就再也回不去了。" —— 吴邪',afterQuote:'吴邪："这帛书上画的是什么？"\n三叔："别问了，有些事不该你知道。"',battleQuote:'"这地方不对劲……" 吴邪握紧了手中的帛书，尸蹩从四面八方涌来！'},
+  {id:1,name:'西沙海底墓',terrain:'blue',mapX:240,mapY:180,monster:'jinpo',monsterName:'禁婆',monsterHp:150,monsterAtk:20,story:'深海之下的神秘墓穴，隐藏着汪藏海的秘密。\n铁三角首次联手，在海底与禁婆展开了惊心动魄的搏斗。',quote:'"海底的黑暗中，有什么东西在看着我……" —— 吴邪',afterQuote:'张起灵："别怕，有我在。"\n王胖子："小哥你这话说得我都感动了！"',battleQuote:'禁婆的长发在水中飘散，张起灵拔出黑金古刀："来了。"'},
+  {id:2,name:'秦岭神树',terrain:'darkgreen',mapX:400,mapY:300,monster:'zhujiuyin',monsterName:'烛九阴',monsterHp:250,monsterAtk:30,story:'秦岭深处的青铜神树，上古烛龙守护着它。\n老痒的出现与消失，青铜树的神秘力量让所有人困惑。\n烛九阴盘踞在神树顶端，双眼如炬。',quote:'"青铜树在复制一切，包括人……包括记忆。" —— 老痒',afterQuote:'吴邪："你是真的老痒吗？"\n老痒："我自己也不知道……"',battleQuote:'烛九阴睁开双眼，烈焰环绕！张起灵："这是上古烛龙……小心它的火焰！"'},
+  {id:3,name:'塔木陀蛇沼',terrain:'brown',mapX:480,mapY:380,monster:'jiguanshe',monsterName:'鸡冠蛇',monsterHp:320,monsterAtk:38,story:'沙漠深处的蛇沼鬼城，西王母的领地。\n陨玉散落在蛇沼各处，散发着诡异的绿光……\n鸡冠蛇（野鸡脖子）从陨玉丛中飞窜而出！',quote:'"这些蛇……头上有鸡冠！它们在模仿人说话！" —— 王胖子',afterQuote:'王胖子："天真你跑快点！这蛇也太多了吧！"\n张起灵："走到我身后。注意陨玉的绿光！"',battleQuote:'鸡冠蛇从陨玉丛中弹射而出，发出诡异的叫声！吴邪："陨玉在发光……"'},
+  {id:4,name:'阴山古楼',terrain:'gray',mapX:560,mapY:200,monster:'miluotuo',monsterName:'密洛陀',monsterHp:420,monsterAtk:48,story:'阴山山脉中的古楼遗迹，机关密布。\n密洛陀——玉俑中的石中人，是张家古楼的守护者。\n它们从石壁中浮现，浑身散发着玉石般的光泽。',quote:'"这座楼……它不是建在地面上的，它是从地下长出来的。" —— 吴邪',afterQuote:'吴邪："这些密洛陀像玉石一样坚硬！"\n张起灵拔出黑金古刀："找到核心……击碎它。"',battleQuote:'密洛陀从石壁中走出，张起灵眼神一凛："石中人的弱点是胸口！"'},
+  {id:5,name:'张家古楼',terrain:'dark',mapX:640,mapY:320,monster:'shibieKing',monsterName:'尸蹩王',monsterHp:550,monsterAtk:55,story:'张家古楼，张起灵的家族秘密在此深藏。\n尸蹩王的巢穴，麒麟血是唯一克制它的力量。\n铁三角面临前所未有的挑战。',quote:'"张家古楼的秘密，就是张起灵的秘密。" —— 解雨臣',afterQuote:'张起灵："这里……我好像来过。"\n吴邪："小哥，你想起什么了吗？"',battleQuote:'尸蹩王从黑暗中现身！张起灵眼神一凛："麒麟血……正是它的克星！"'},
+  {id:6,name:'长白山云顶天宫',terrain:'white',mapX:720,mapY:140,monster:'wannuwang',monsterName:'万奴王',monsterHp:550,monsterAtk:50,story:'长白山之巅，雪域中的云顶天宫。\n万奴王的陵寝，青铜门的所在地。',quote:'"青铜门后面，是世界的真相。" —— 张起灵',afterQuote:'吴邪："小哥，你一定要进去吗？"\n张起灵沉默良久："这是我的宿命。"',battleQuote:'万奴王从王座上站起，张起灵握紧黑金古刀："青铜门……就在后面。"'},
+  {id:7,name:'青铜门',terrain:'gold',mapX:800,mapY:260,monster:'bronzeGuard',monsterName:'青铜门守护者',monsterHp:600,monsterAtk:60,story:'云顶天宫的最深处，巨大的青铜门矗立在眼前。\n门上镌刻着古老的纹路，散发着幽深的光芒。\n张起灵静静地站在门前，仿佛已经等待了千年。\n这是终极的秘密，也是他无法逃避的宿命。',quote:'"我是一个没有过去和未来的人。如果有一天我在这扇门里消失了，不要来找我。" —— 张起灵',afterQuote:'吴邪死死攥住张起灵的衣袖："小哥……十年后，我会来接你。"\n张起灵没有说话，只是轻轻点了点头。\n青铜门缓缓打开，远古的气息从门缝中涌出……',battleQuote:'青铜门的守护力量苏醒了！张起灵最后看了吴邪一眼："记住你的话……十年。"',isFinal:true}
+];
+
+// 每关结束后显示的原著台词
+const LEVEL_ENDINGS=[
+  '"有些秘密，一旦知道了，就再也回不去了。"\n—— 吴邪，《七星鲁王宫》',
+  '"海底的黑暗中，汪藏海留下了青铜门的线索。"\n—— 《怒海潜沙》',
+  '"青铜树在复制一切，包括人的记忆……和人的灵魂。"\n—— 老痒，《秦岭神树》',
+  '"陨玉来自天外，西王母的秘密远比我们想象的更加古老。"\n—— 《蛇沼鬼城》',
+  '"这座古楼不是建在地面上的，它是从地下长出来的。"\n—— 吴邪，《阴山古楼》',
+  '"张家古楼的秘密，就是张起灵的全部过去。"\n—— 解雨臣，《张家古楼》',
+  '"青铜门后面，是世界的真相，也是张起灵的宿命。"\n—— 《云顶天宫》',
+  '"用我一生，换你十年天真无邪。"\n—— 张起灵，《大结局·青铜门》'
+];
+
+// ==================== 角色数据 ====================
+const CHARS=[
+  {name:'吴邪',key:'wuxie',hp:120,maxHp:120,atk:12,def:6,skillName:'机关破解',skill2Name:'分析',color:'#00E436',sprite:'wuxie'},
+  {name:'张起灵',key:'zhang',hp:250,maxHp:250,atk:50,def:10,skillName:'麒麟重斩',skill2Name:'麒麟血脉',color:'#29ADFF',sprite:'zhang'},
+  {name:'王胖子',key:'wang',hp:200,maxHp:200,atk:35,def:18,skillName:'炸弹',skill2Name:'嘲讽',color:'#FFEC27',sprite:'wang'}
+];
+
+// ==================== 游戏状态 ====================
+const game={
+  state:'title',currentLevel:0,unlockedLevel:0,intimacy:0,playerNode:0,
+  moving:false,moveProgress:0,moveFrom:{x:0,y:0},moveTo:{x:0,y:0},
+  characters:JSON.parse(JSON.stringify(CHARS)),
+  deadChars:[false,false,false],
+  monster:null,battleTurn:0,defending:false,
+  particles:[],shakeAmount:0,storyIndex:0,battleLog:[],
+  battlePhase:'player',skillCooldown:{qilin:0,bomb:0,crack:0},
+  comboUnlocked:false,endingTimer:0,cachedTerrain:null,
+  showedSkillPanel:false,monsterDefDebuff:0,critBuff:0,
+  items:{heal:0,atkBoost:0,shield:0},
+  itemAtkBoost:0,itemShield:0,
+  // 新增：特效+防连点+引导
+  screenFlash:{color:'#fff',alpha:0,duration:0},
+  monsterFlash:0,inputLocked:false,
+  tutorialShown:false,loaded:false
+};
+
+// ==================== 存档系统 ====================
+function saveGame(){
+  try{
+    const save={
+      maxUnlockedStage:game.unlockedLevel,intimacy:game.intimacy,
+      characters:game.characters.map(c=>({hp:c.hp,maxHp:c.maxHp,atk:c.atk,def:c.def})),
+      items:game.items,comboUnlocked:game.comboUnlocked
+    };
+    localStorage.setItem('daomu_save',JSON.stringify(save));
+    return true;
+  }catch(e){return false}
+}
+function loadGame(){
+  try{
+    const raw=localStorage.getItem('daomu_save');
+    if(!raw)return false;
+    const save=JSON.parse(raw);
+    game.unlockedLevel=save.maxUnlockedStage||save.unlockedLevel||0;
+    game.intimacy=save.intimacy||0;
+    game.items=save.items||{heal:0,atkBoost:0,shield:0};
+    game.comboUnlocked=save.comboUnlocked||false;
+    if(save.characters)save.characters.forEach((c,i)=>{if(game.characters[i]){game.characters[i].hp=c.hp;game.characters[i].maxHp=c.maxHp;game.characters[i].atk=c.atk;game.characters[i].def=c.def}});
+    game.playerNode=game.unlockedLevel;
+    return true;
+  }catch(e){return false}
+}
+function deleteSave(){try{localStorage.removeItem('daomu_save')}catch(e){}}
+function flashSaveIndicator(){
+  const el=document.getElementById('save-indicator');if(!el)return;
+  el.style.display='inline';setTimeout(()=>{el.style.display='none'},1500);
+}
+
+// ==================== 羁绊值Buff系统 ====================
+function getIntimacyBuff(){
+  if(game.intimacy>=90)return{atkMul:1.40,defMul:1.30,critBonus:10,tier:'高阶羁绊',color:'#ff1493'};
+  if(game.intimacy>=60)return{atkMul:1.25,defMul:1.20,critBonus:5,tier:'中阶羁绊',color:'#ff6b9d'};
+  if(game.intimacy>=30)return{atkMul:1.15,defMul:1.10,critBonus:0,tier:'初阶羁绊',color:'#ff9eb5'};
+  return{atkMul:1.0,defMul:1.0,critBonus:0,tier:'无',color:'#888'};
+}
+function getBuffAtk(baseAtk){return Math.floor(baseAtk*getIntimacyBuff().atkMul)}
+function getBuffDef(baseDef){return Math.floor(baseDef*getIntimacyBuff().defMul)}
+
+function increaseIntimacy(a){
+  const oldTier=getIntimacyBuff().tier;
+  game.intimacy=Math.min(100,game.intimacy+a);
+  const b=getIntimacyBuff();
+  document.getElementById('intimacy-bar-inner').style.width=game.intimacy+'%';
+  document.getElementById('intimacy-value').textContent=game.intimacy;
+  const bi=document.getElementById('buff-indicator');
+  if(b.tier!=='无'){
+    bi.style.display='inline';bi.style.color=b.color;bi.style.borderColor=b.color;
+    bi.textContent='羁绊加成: ATK+'+(Math.round((b.atkMul-1)*100))+'% DEF+'+(Math.round((b.defMul-1)*100))+'%'+(b.critBonus>0?' 暴击+'+b.critBonus+'%':'');
+  }else{bi.style.display='none'}
+  if(b.tier!==oldTier&&b.tier!=='无'){
+    showToast('💕 羁绊突破！'+b.tier+'！全队ATK+'+(Math.round((b.atkMul-1)*100))+'% DEF+'+(Math.round((b.defMul-1)*100))+'%');
+    spawnParticles(450,320,isMobile?12:25,b.color);
+  }
+  if(game.intimacy===30&&!game.comboUnlocked){game.comboUnlocked=true;showToast('🔓 瓶邪联手技解锁！')}
+}
+
+function quitToTitle(){
+  document.getElementById('dialogue-box').style.display='none';
+  document.getElementById('skill-popup').style.display='none';
+  document.getElementById('skill-overview').style.display='none';
+  document.getElementById('battle-panel').style.display='none';
+  document.getElementById('item-bar').style.display='none';
+  document.getElementById('tutorial-overlay').style.display='none';
+  if(isMobile)document.getElementById('touch-battle').style.display='none';
+  if(game.state==='battle'||game.state==='victory'||game.state==='story')saveGame();
+  restartGame();
+}
+
+// ==================== 道具系统 ====================
+function awardRandomItem(){
+  const r=Math.random();let type,emoji,name;
+  if(r<0.5){type='heal';emoji='💚';name='回血丹'}
+  else if(r<0.8){type='atkBoost';emoji='🔥';name='增攻符'}
+  else{type='shield';emoji='🛡';name='护盾符'}
+  game.items[type]=(game.items[type]||0)+1;
+  addBattleLog(emoji+' 获得道具：【'+name+'】！');
+  updateItemUI();
+}
+function useItem(type){
+  if(game.state!=='battle'||game.battlePhase!=='player'||game.inputLocked)return;
+  if(!game.items[type]||game.items[type]<=0){addBattleLog('没有可用的道具');return}
+  game.items[type]--;game.inputLocked=true;game.battlePhase='animating';
+  if(type==='heal'){
+    const alive=[];game.characters.forEach((c,i)=>{if(isAlive(i))alive.push({i,c,ratio:c.hp/c.maxHp})});
+    alive.sort((a,b)=>a.ratio-b.ratio);
+    const t=alive[0],healAmt=Math.floor(t.c.maxHp*0.5);
+    t.c.hp=Math.min(t.c.maxHp,t.c.hp+healAmt);
+    addBattleLog('💚 '+t.c.name+' 使用【回血丹】恢复 '+healAmt+' HP！');
+    spawnParticles(150+t.i*200,380,isMobile?5:10,'#4eff4e');game.shakeAmount=2;
+  }else if(type==='atkBoost'){
+    game.itemAtkBoost=1;
+    addBattleLog('🔥 使用【增攻符】！本回合攻击力×2！');
+    spawnParticles(450,300,isMobile?7:14,'#ff6347');game.shakeAmount=3;
+  }else if(type==='shield'){
+    game.itemShield=40;
+    addBattleLog('🛡 使用【护盾符】！全队获得40点护盾！');
+    spawnParticles(200,300,isMobile?6:12,'#6495ed');game.shakeAmount=2;
+  }
+  updateItemUI();updateUI();
+  setTimeout(()=>{game.battlePhase='player';game.inputLocked=false;updateUI()},400);
+}
+function updateItemUI(){
+  ['heal','atkBoost','shield'].forEach(t=>{
+    const el=document.getElementById('cnt-'+t);if(el)el.textContent='×'+game.items[t];
+    const btn=document.getElementById('btn-'+t);if(btn)btn.disabled=!game.items[t]||game.items[t]<=0;
+  });
+}
+
+// ==================== 新手引导 ====================
+function showTutorial(){
+  if(game.tutorialShown)return;
+  document.getElementById('tutorial-overlay').style.display='flex';
+}
+function closeTutorial(){
+  document.getElementById('tutorial-overlay').style.display='none';
+  game.tutorialShown=true;
+}
+
+// ==================== 输入处理（含防连点） ====================
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.key]=true;handleInput(e.key);if(e.key!=='r'&&e.key!=='R')e.preventDefault()});
+window.addEventListener('keyup',e=>{keys[e.key]=false;e.preventDefault()});
+
+function toggleSkillOverview(){
+  const so=document.getElementById('skill-overview');
+  so.style.display=so.style.display==='flex'?'none':'flex';
+}
+
+function handleInput(key){
+  if(game.inputLocked&&game.state==='battle')return;
+  if(game.state==='title'){
+    if(key==='c'||key==='C'){if(loadGame()){game.state='map';game.showedSkillPanel=false;updateUI();showToast('💾 存档已加载！从第'+(game.unlockedLevel+1)+'关继续')}else{showToast('没有找到存档，请开始新游戏')}return}
+    if(key==='Enter'||key===' '){deleteSave();game.state='map';game.showedSkillPanel=false;document.getElementById('skill-popup').style.display='flex';updateUI()}
+    return;
+  }
+  if(game.state==='map'){
+    const sp=document.getElementById('skill-popup');
+    const so=document.getElementById('skill-overview');
+    if(sp.style.display==='flex'){if(key===' '||key==='Enter'){sp.style.display='none';game.showedSkillPanel=true}return}
+    if(key==='h'||key==='H'){toggleSkillOverview();return}
+    if(so.style.display==='flex')return;
+    if(key==='ArrowRight'||key==='d'||key==='D')movePlayer(1);
+    if(key==='ArrowLeft'||key==='a'||key==='A')movePlayer(-1);
+    if(key==='Enter'||key===' '){if(game.playerNode<=game.unlockedLevel)enterLevel(game.playerNode)}
+    return;
+  }
+  if(game.state==='story'){if(key==='Enter'||key===' '||key==='ArrowRight')advanceStory();return}
+  if(game.state==='battle'){
+    if(game.battlePhase!=='player')return;
+    if(key==='1')battleAction('attack');if(key==='2')battleAction('qilin');
+    if(key==='3')battleAction('bomb');if(key==='4')battleAction('crack');if(key==='5')battleAction('defend');
+    if(key==='6')useItem('heal');if(key==='7')useItem('atkBoost');if(key==='8')useItem('shield');
+    return;
+  }
+  if(game.state==='ending'){if(key==='r'||key==='R')restartGame();return}
+}
+
+// ==================== 工具函数 ====================
+function isAlive(i){return !game.deadChars[i]}
+function aliveChars(){return game.characters.filter((c,i)=>isAlive(i))}
+function checkDeaths(){
+  game.characters.forEach((c,i)=>{if(c.hp<=0&&!game.deadChars[i]){c.hp=0;game.deadChars[i]=true;addBattleLog('💀 '+c.name+'阵亡！无法继续参战');spawnParticles(150+i*200,400,isMobile?6:12,'#e74c3c');game.shakeAmount=6;flashScreen('#e74c3c',0.3,8)}})
+  updateUI();
+}
+function movePlayer(dir){
+  const t=game.playerNode+dir;if(t<0||t>game.unlockedLevel||game.moving)return;
+  game.moving=true;game.moveProgress=0;
+  game.moveFrom={x:LEVELS[game.playerNode].mapX,y:LEVELS[game.playerNode].mapY};
+  game.moveTo={x:LEVELS[t].mapX,y:LEVELS[t].mapY};game.playerNode=t;updateUI();
+}
+function enterLevel(i){if(i>game.unlockedLevel)return;game.currentLevel=i;game.storyIndex=0;game.state='story';showStory()}
+function goNextLevel(n){
+  document.getElementById('dialogue-box').style.display='none';
+  game.state='map';game.playerNode=n;updateUI();
+}
+function showStory(){
+  const l=LEVELS[game.currentLevel],b=document.getElementById('dialogue-box');
+  b.innerHTML='<div class="speaker">📜 第'+(game.currentLevel+1)+'关：'+l.name+'</div><div>'+l.story.replace(/\n/g,'<br>')+'</div><div style="margin-top:8px;color:#e2b04a;">"'+l.quote+'"</div><div class="hint">按 空格键/回车 继续……</div>';
+  b.style.display='block';
+}
+function advanceStory(){
+  game.storyIndex++;const l=LEVELS[game.currentLevel];
+  if(game.storyIndex===1){document.getElementById('dialogue-box').innerHTML='<div class="speaker">💬</div><div>'+l.afterQuote.replace(/\n/g,'<br>')+'</div><div class="hint">按 空格键/回车 迎战！</div>'}
+  else{document.getElementById('dialogue-box').style.display='none';startBattle()}
+}
+
+// ==================== 像素战斗特效 ====================
+function flashScreen(color,alpha,duration){game.screenFlash={color:color||'#fff',alpha:alpha||0.4,duration:duration||6}}
+
+// ==================== 战斗系统 ====================
+function isShibieKing(){return LEVELS[game.currentLevel].monster==='shibieKing'}
+function zhangCountersMonster(){return isAlive(1)&&isShibieKing()}
+
+function startBattle(){
+  const l=LEVELS[game.currentLevel];
+  game.state='battle';game.battlePhase='player';game.battleTurn=0;game.inputLocked=false;
+  game.defending=false;game.battleLog=[];game.particles=[];
+  game.skillCooldown={qilin:0,bomb:0,crack:0};
+  game.monsterDefDebuff=0;game.critBuff=3;
+  game.deadChars=[false,false,false];
+  game.characters.forEach(c=>{c.hp=c.maxHp});
+  game.itemAtkBoost=0;game.itemShield=0;
+  game.screenFlash={color:'#fff',alpha:0,duration:0};game.monsterFlash=0;
+  const diff=1+game.currentLevel*0.25;
+  game.monster={name:l.monsterName,sprite:l.monster,hp:Math.floor(l.monsterHp*diff),maxHp:Math.floor(l.monsterHp*diff),atk:Math.floor(l.monsterAtk*diff),def:Math.floor(5+game.currentLevel*3)};
+  document.getElementById('dialogue-box').style.display='none';
+  document.getElementById('battle-panel').style.display=isMobile?'none':'flex';
+  document.getElementById('item-bar').style.display='flex';
+  if(isMobile)document.getElementById('touch-battle').style.display='flex';
+  updateItemUI();
+  addBattleLog('⚔ '+l.monsterName+'出现了！');
+  if(zhangCountersMonster())addBattleLog('🩸 张起灵麒麟血克制尸蹩王！伤害×1.5！');
+  const b=getIntimacyBuff();
+  if(b.tier!=='无')addBattleLog('💕 羁绊加成：ATK+'+(Math.round((b.atkMul-1)*100))+'% DEF+'+(Math.round((b.defMul-1)*100))+'%');
+  addBattleLog('🔍 吴邪发动【分析】！全队暴击率↑3回合');
+  setBattleBtnsDisabled(false);updateUI();
+  if(!game.tutorialShown)showTutorial();
+}
+
+function battleAction(type){
+  if(game.state!=='battle'||game.battlePhase!=='player'||game.inputLocked)return;
+  game.inputLocked=true;game.battlePhase='animating';game.defending=false;
+  setBattleBtnsDisabled(true);
+  const buff=getIntimacyBuff();
+  let dmg=0,skillUsed=false,skillColor='#e2b04a',logMsg='';
+
+  if(type==='attack'){
+    const alive=aliveChars();if(alive.length===0){game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    let totalAtk=alive.reduce((s,c)=>s+getBuffAtk(c.atk),0);
+    let def=game.monster.def-(game.monsterDefDebuff>0?8:0);
+    dmg=Math.max(1,totalAtk-def+Math.floor(Math.random()*20)-10);
+    if(game.itemAtkBoost>0){dmg=Math.floor(dmg*2);logMsg='🔥增攻符！伤害×2！';game.itemAtkBoost=0}
+    const critChance=0.3+(buff.critBonus/100);
+    if(game.critBuff>0&&Math.random()<critChance){dmg=Math.floor(dmg*1.8);logMsg+='💥暴击！';flashScreen('#fff',0.5,8);game.shakeAmount=6}
+    addBattleLog('铁三角('+alive.length+'人)联合攻击！'+logMsg);
+    spawnParticles(450,300,isMobile?4:8,'#e2b04a');game.shakeAmount=4;
+  }else if(type==='qilin'){
+    if(!isAlive(1)){addBattleLog('张起灵已阵亡');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    if(game.skillCooldown.qilin>0){addBattleLog('麒麟重斩冷却中…还需'+game.skillCooldown.qilin+'回合');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    const zhang=game.characters[1];
+    let baseDmg=Math.floor(getBuffAtk(zhang.atk)*3.0);
+    const bloodActive=zhang.hp<zhang.maxHp*0.5;
+    if(bloodActive){baseDmg=Math.floor(baseDmg*2);logMsg='🩸麒麟血脉狂暴！伤害×2！'}
+    if(zhangCountersMonster()){baseDmg=Math.floor(baseDmg*1.5);logMsg+='🔥麒麟血克制尸蹩王！'}
+    if(game.itemAtkBoost>0){baseDmg=Math.floor(baseDmg*2);logMsg+='🔥增攻符！';game.itemAtkBoost=0}
+    const critChance=0.4+(buff.critBonus/100);
+    if(game.critBuff>0&&Math.random()<critChance){baseDmg=Math.floor(baseDmg*2);logMsg+='💥暴击！';flashScreen('#29ADFF',0.6,10);game.shakeAmount=14}
+    dmg=Math.max(15,baseDmg-(bloodActive?0:game.monster.def)+Math.floor(Math.random()*15));
+    skillUsed=true;skillColor='#29ADFF';
+    game.skillCooldown.qilin=bloodActive?1:3;
+    addBattleLog('🔷 张起灵发动【麒麟重斩】！'+logMsg);
+    spawnParticles(450,300,isMobile?11:22,'#29ADFF');game.shakeAmount=12;
+  }else if(type==='bomb'){
+    if(!isAlive(2)){addBattleLog('王胖子已阵亡');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    if(game.skillCooldown.bomb>0){addBattleLog('炸弹冷却中…还需'+game.skillCooldown.bomb+'回合');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    const wang=game.characters[2];
+    dmg=Math.floor(getBuffAtk(wang.atk)*2.0)+Math.floor(Math.random()*25);
+    if(game.itemAtkBoost>0){dmg=Math.floor(dmg*2);logMsg='🔥增攻符！';game.itemAtkBoost=0}
+    game.defending=true;
+    skillUsed=true;skillColor='#FFEC27';game.skillCooldown.bomb=2;
+    addBattleLog('💣 王胖子扔出【炸弹】！附带嘲讽拉仇恨'+logMsg);
+    spawnParticles(450,300,isMobile?8:16,'#FFEC27');game.shakeAmount=7;
+  }else if(type==='crack'){
+    if(!isAlive(0)){addBattleLog('吴邪已阵亡');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    if(game.skillCooldown.crack>0){addBattleLog('机关破解冷却中…还需'+game.skillCooldown.crack+'回合');game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);return}
+    const wuxie=game.characters[0];
+    dmg=Math.floor(getBuffAtk(wuxie.atk)*1.8)+Math.floor(Math.random()*15);
+    if(game.itemAtkBoost>0){dmg=Math.floor(dmg*2);logMsg='🔥增攻符！';game.itemAtkBoost=0}
+    game.monsterDefDebuff=3;game.critBuff=Math.max(game.critBuff,3);
+    skillUsed=true;skillColor='#00E436';game.skillCooldown.crack=2;
+    addBattleLog('🔧 吴邪发动【机关破解】！伤害+敌防↓3回合+暴击↑刷新'+logMsg);
+    spawnParticles(300,300,isMobile?6:12,'#00E436');game.shakeAmount=3;
+  }else if(type==='defend'){
+    game.defending=true;
+    addBattleLog('🛡 铁三角架起防御姿态！');
+    spawnParticles(200,350,isMobile?3:6,'#FFEC27');
+    game.battlePhase='monster';game.inputLocked=false;setBattleBtnsDisabled(false);
+    setTimeout(()=>{monsterTurn()},800);updateUI();return;
+  }
+
+  game.monster.hp-=dmg;if(game.monster.hp<0)game.monster.hp=0;
+  game.monsterFlash=8;
+  showDamageNumber(480,280,dmg,skillColor);updateUI();
+  setTimeout(()=>{
+    if(game.monster.hp<=0)battleVictory();
+    else{game.battlePhase='monster';game.inputLocked=false;setBattleBtnsDisabled(false);setTimeout(()=>{monsterTurn()},600)}
+  },700);
+}
+
+function monsterTurn(){
+  if(game.state!=='battle')return;
+  const aliveIdx=[];game.characters.forEach((c,i)=>{if(isAlive(i))aliveIdx.push(i)});
+  if(aliveIdx.length===0){battleDefeat();return}
+  const buff=getIntimacyBuff();
+  let dmg=game.monster.atk+Math.floor(Math.random()*15)-5;
+  if(game.defending){dmg=Math.floor(dmg*0.3);game.defending=false}
+  dmg=Math.max(3,dmg);
+  dmg=Math.floor(dmg/Math.max(0.5,buff.defMul-0.5));
+  if(game.itemShield>0){
+    const absorbed=Math.min(game.itemShield,dmg);
+    game.itemShield-=absorbed;dmg-=absorbed;
+    if(game.itemShield<=0){game.itemShield=0;addBattleLog('🛡 护盾已破碎！')}
+    else addBattleLog('🛡 护盾吸收'+absorbed+'点！（剩余'+game.itemShield+'）')
+  }
+  const targetIdx=aliveIdx[Math.floor(Math.random()*aliveIdx.length)];
+  const target=game.characters[targetIdx];
+  if(targetIdx===1&&target.hp<target.maxHp*0.5){dmg=Math.floor(dmg*0.5)}
+  target.hp-=dmg;if(target.hp<0)target.hp=0;
+  addBattleLog(game.monster.name+'攻击了'+target.name+'！(-'+dmg+'HP)');
+  showDamageNumber(150+targetIdx*200,400,dmg,'#e74c3c');game.shakeAmount=3;
+  spawnParticles(150+targetIdx*200,400,isMobile?3:5,'#e74c3c');
+  checkDeaths();updateUI();
+  setTimeout(()=>{
+    if(game.characters.every((c,i)=>!isAlive(i))){battleDefeat();return}
+    game.battleTurn++;
+    for(let k in game.skillCooldown)if(game.skillCooldown[k]>0)game.skillCooldown[k]--;
+    if(game.monsterDefDebuff>0)game.monsterDefDebuff--;
+    if(game.critBuff>0)game.critBuff--;
+    game.battlePhase='player';game.inputLocked=false;setBattleBtnsDisabled(false);updateUI();
+  },700);
+}
+
+function setBattleBtnsDisabled(dis){
+  ['btn-attack','btn-qilin','btn-bomb','btn-crack','btn-defend','tbtn-attack','tbtn-qilin','tbtn-bomb','tbtn-crack','tbtn-defend'].forEach(id=>{
+    const btn=document.getElementById(id);if(btn)btn.disabled=dis;
+  });
+}
+
+function battleVictory(){
+  game.state='victory';game.inputLocked=false;
+  document.getElementById('battle-panel').style.display='none';
+  document.getElementById('item-bar').style.display='none';
+  if(isMobile)document.getElementById('touch-battle').style.display='none';
+  addBattleLog('🎉 击败了'+game.monster.name+'！');
+  const intimacyGain=game.currentLevel===7?Math.max(16,100-game.intimacy):12;increaseIntimacy(intimacyGain);
+  game.characters.forEach(c=>{c.maxHp+=20;c.hp=c.maxHp;c.atk+=3;c.def+=2});
+  if(game.currentLevel>=game.unlockedLevel&&game.currentLevel<7)game.unlockedLevel=game.currentLevel+1;
+  awardRandomItem();saveGame();flashSaveIndicator();updateUI();
+  const l=LEVELS[game.currentLevel],b=document.getElementById('dialogue-box');
+  if(l.isFinal){
+    game.intimacy=100;increaseIntimacy(0);
+    b.innerHTML='<div class="speaker">🎉 终章通关！</div><div>击败了<strong>'+l.monsterName+'</strong>！</div><div style="color:#ff1493;margin:6px 0">💕 羁绊值已达满级100！铁三角的羁绊永不磨灭！</div><div class="hint">按 空格键 观看结局</div>';
+    b.style.display='block';
+    const hf=(e)=>{if((e.key===' '||e.key==='Enter')&&game.state==='victory'){window.removeEventListener('keydown',hf);b.style.display='none';game.state='ending';game.endingTimer=0}};
+    window.addEventListener('keydown',hf);
+  }else{
+    const endQuote=LEVEL_ENDINGS[game.currentLevel]||'';
+    const nextLevel=game.currentLevel+1;
+    b.innerHTML='<div class="speaker">🎉 闯关成功！</div><div>击败了<strong>'+l.monsterName+'</strong>！</div><div style="color:#e2b04a;margin:6px 0;font-style:italic">📖 '+endQuote+'</div><div>并肩作战，羁绊值提升 | 全员升级复活 | 获得随机道具 | 💾已自动存档</div><div class="hint"><button onclick="goNextLevel('+nextLevel+')" style="padding:8px 20px;font-size:16px;font-family:inherit;background:#e2b04a;color:#000;border:none;cursor:pointer;font-weight:bold;margin-right:10px">▶ 进入下一关：'+LEVELS[nextLevel].name+'</button> 或按 空格键</div>';
+    b.style.display='block';
+    const h=(e)=>{if((e.key===' '||e.key==='Enter')&&game.state==='victory'){window.removeEventListener('keydown',h);goNextLevel(nextLevel)}};
+    window.addEventListener('keydown',h);
+  }
+}
+function battleDefeat(){
+  game.inputLocked=false;
+  addBattleLog('💀 铁三角全军覆没……');
+  document.getElementById('battle-panel').style.display='none';
+  document.getElementById('item-bar').style.display='none';
+  if(isMobile)document.getElementById('touch-battle').style.display='none';
+  const b=document.getElementById('dialogue-box');
+  b.innerHTML='<div class="speaker">💀 战斗失败</div><div>铁三角不敌<strong>'+game.monster.name+'</strong>……</div><div class="hint">按 空格键 重新挑战（道具保留）</div>';
+  b.style.display='block';
+  const h=(e)=>{if(e.key===' '||e.key==='Enter'){window.removeEventListener('keydown',h);b.style.display='none';startBattle()}};
+  window.addEventListener('keydown',h);
+}
+
+// ==================== UI更新 ====================
+function updateUI(){
+  const l=LEVELS[game.playerNode]||LEVELS[0],buff=getIntimacyBuff();
+  document.getElementById('level-name').textContent=l.name;
+  game.characters.forEach((c,i)=>{
+    const ks=['wuxie','zhang','wang'],k=ks[i];
+    document.getElementById(k+'-lv').textContent=1+game.currentLevel;
+    document.getElementById(k+'-hp').textContent=c.hp;
+    document.getElementById(k+'-maxhp').textContent=c.maxHp;
+    document.getElementById(k+'-atk').textContent=getBuffAtk(c.atk);
+    document.getElementById(k+'-bar').style.width=(c.hp/c.maxHp*100)+'%';
+    const card=document.getElementById('card-'+k);
+    if(game.deadChars[i])card.classList.add('dead');else card.classList.remove('dead');
+  });
+  ['qilin','bomb','crack'].forEach((sk,i)=>{
+    const ids=['btn-qilin','btn-bomb','btn-crack'],names=['🔷 2.麒麟重斩','💣 3.炸弹','🔧 4.机关破解'];
+    const cd=game.skillCooldown[sk]||0,btn=document.getElementById(ids[i]);if(!btn)return;
+    if(cd>0){btn.textContent='⏳ CD:'+cd;btn.disabled=true}else{btn.textContent=names[i];btn.disabled=false}
+    const charIdx=[1,2,0][i];if(game.deadChars[charIdx]){btn.disabled=true;btn.textContent='💀 阵亡'}
+    // 同步触屏按钮
+    const tbtn=document.getElementById('t'+ids[i]);if(tbtn){if(cd>0){tbtn.textContent='⏳CD:'+cd;tbtn.disabled=true}else{tbtn.textContent=names[i].replace('2.','').replace('3.','').replace('4.','').trim();tbtn.disabled=false}if(game.deadChars[charIdx]){tbtn.disabled=true;tbtn.textContent='💀阵亡'}}
+  });
+  // 同步触屏攻击和防御按钮
+  const tAtk=document.getElementById('tbtn-attack');if(tAtk){const allDead=game.deadChars.every(d=>d);tAtk.disabled=allDead;if(allDead)tAtk.textContent='💀攻击';else{tAtk.disabled=false;tAtk.textContent='⚔1攻击'}}
+  const tDef=document.getElementById('tbtn-defend');if(tDef){tDef.disabled=false;tDef.textContent='🛡5防御'}
+  // 同步桌面端攻击和防御按钮
+  const btnAtk=document.getElementById('btn-attack');if(btnAtk){const allDead2=game.deadChars.every(d=>d);btnAtk.disabled=allDead2;if(allDead2)btnAtk.textContent='💀 1.团队攻击';else{btnAtk.disabled=false;btnAtk.textContent='⚔ 1.团队攻击'}}
+  const btnDef=document.getElementById('btn-defend');if(btnDef){btnDef.disabled=false;btnDef.textContent='🛡 5.防御'}
+  document.getElementById('intimacy-bar-inner').style.width=game.intimacy+'%';
+  document.getElementById('intimacy-value').textContent=game.intimacy;
+  const bi=document.getElementById('buff-indicator');
+  if(buff.tier!=='无'){
+    bi.style.display='inline';bi.style.color=buff.color;bi.style.borderColor=buff.color;
+    bi.textContent='羁绊: ATK+'+(Math.round((buff.atkMul-1)*100))+'% DEF+'+(Math.round((buff.defMul-1)*100))+'%';
+  }else{bi.style.display='none'}
+  updateItemUI();
+}
+
+function showToast(m){
+  const t=document.getElementById('message-toast');t.textContent=m;t.style.display='block';t.style.animation='none';t.offsetHeight;t.style.animation='toastFade 2s forwards';
+  setTimeout(()=>{t.style.display='none'},2000);
+}
+function addBattleLog(m){game.battleLog.unshift(m);if(game.battleLog.length>8)game.battleLog.pop()}
+function showDamageNumber(x,y,d,c){game.particles.push({type:'damage',x,y,text:'-'+d,color:c,life:60,vy:-2})}
+function spawnParticles(x,y,n,c){for(let i=0;i<n;i++)game.particles.push({type:'spark',x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-3,life:18+Math.random()*16,color:c,size:2+Math.floor(Math.random()*3)})}
+
+// ==================== 渲染 ====================
+function drawMap(){
+  if(!game.cachedTerrain)game.cachedTerrain=genTerrain();
+  const md=game.cachedTerrain,bs=20;
+  for(let r=0;r<md.length;r++)for(let c=0;c<md[r].length;c++)px(c*bs,r*bs,bs,bs,md[r][c]);
+  ctx.strokeStyle='#d4a574';ctx.lineWidth=7;ctx.lineCap='round';ctx.setLineDash([12,6]);ctx.beginPath();
+  LEVELS.forEach((l,i)=>{if(i===0)ctx.moveTo(l.mapX,l.mapY);else ctx.lineTo(l.mapX,l.mapY)});ctx.stroke();ctx.setLineDash([]);
+  if(game.playerNode===3||game.state==='map'){
+    const yx=LEVELS[3].mapX,yy=LEVELS[3].mapY;
+    ctx.fillStyle='rgba(0,255,100,0.08)';ctx.beginPath();ctx.arc(yx,yy,40,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<5;i++){const ax=yx-30+i*15,ay=yy-20+Math.sin(i*1.5)*18;ctx.fillStyle='rgba(0,255,100,'+(0.3+Math.sin(Date.now()/800+i)*0.2)+')';ctx.fillRect(ax-2,ay-2,4,4)}
+  }
+  LEVELS.forEach((l,i)=>{
+    const locked=i>game.unlockedLevel,cur=i===game.playerNode;
+    if(cur){ctx.fillStyle='rgba(226,176,74,0.3)';ctx.beginPath();ctx.arc(l.mapX,l.mapY,18+Math.sin(Date.now()/300)*3,0,Math.PI*2);ctx.fill()}
+    const cls={green:'#4a8c3f',blue:'#2980b9',darkgreen:'#2d5a27',brown:'#8b6914',gray:'#7f8c8d',dark:'#2c3e50',white:'#bdc3c7',gold:'#e2b04a'};
+    ctx.fillStyle=locked?'#555':(cls[l.terrain]||'#e74c3c');ctx.fillRect(l.mapX-12,l.mapY-12,24,24);
+    ctx.strokeStyle=cur?'#e2b04a':'#fff';ctx.lineWidth=cur?3:1.5;ctx.strokeRect(l.mapX-12,l.mapY-12,24,24);
+    ctx.fillStyle='#fff';ctx.font='bold 14px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText(i+1,l.mapX,l.mapY+5);
+    ctx.fillStyle='#ecf0f1';ctx.font='12px "ZCOOL KuaiLe","SimHei"';ctx.fillText(l.name,l.mapX,l.mapY-22);
+    if(locked){ctx.fillStyle='#e74c3c';ctx.font='16px "ZCOOL KuaiLe"';ctx.fillText('🔒',l.mapX,l.mapY-36)}
+  });
+  const pl=LEVELS[game.playerNode];let px_,py_;
+  if(game.moving){const t=Math.min(1,game.moveProgress);px_=game.moveFrom.x+(game.moveTo.x-game.moveFrom.x)*t;py_=game.moveFrom.y+(game.moveTo.y-game.moveFrom.y)*t}
+  else{px_=pl.mapX;py_=pl.mapY}
+  drawSprite(S.wuxie,px_-24,py_-48,3);drawSprite(S.zhang,px_-6,py_-48,3);drawSprite(S.wang,px_+10,py_-48,3);
+  ctx.fillStyle='#e2b04a';ctx.font='bold 12px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('铁三角',px_,py_-58);
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(W-155,8,147,38);
+  ctx.fillStyle='#ecf0f1';ctx.font='10px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='left';
+  ctx.fillText('←→移动 空格进入 H技能',W-148,22);ctx.fillText('解锁:'+(game.unlockedLevel+1)+'/8 | 羁绊:'+game.intimacy,W-148,38);
+}
+function genTerrain(){
+  const rs=Math.ceil(H/20),cs=Math.ceil(W/20),t=[];
+  for(let r=0;r<rs;r++){t[r]=[];for(let c=0;c<cs;c++){const x=c*20,y=r*20;let cl='#3a5a3a';if(y<100)cl='#4a7a4a';if(y>400)cl='#5a4a3a';if(x<180)cl='#4a8a4a';if(x>180&&x<350)cl='#2a5a6a';if(x>350&&x<520)cl='#3a5a3a';if(x>520&&x<620)cl='#5a4a3a';if(x>620&&x<700)cl='#4a4a4a';if(x>700&&x<760)cl='#5a5a6a';if(x>760)cl='#5a5a4a';const n=Math.floor(Math.random()*15-7);t[r][c]=adjCol(cl,n)}}return t}
+function adjCol(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,v+a)).toString(16).padStart(2,'0')).join('')}
+function drawBattle(){
+  const l=LEVELS[game.currentLevel];
+  const tc={green:'#1a2e1a',blue:'#1a1a2e',darkgreen:'#1a2a1a',brown:'#2e2a1a',gray:'#2a2a2a',dark:'#1a1a1a',white:'#2a2a3a',gold:'#2e2a1a'};
+  ctx.fillStyle=tc[l.terrain]||'#1a1a2e';ctx.fillRect(0,0,W,H);
+  if(game.currentLevel===3){ctx.fillStyle='rgba(0,255,100,0.06)';ctx.fillRect(0,0,W,H);for(let i=0;i<8;i++){ctx.fillStyle='rgba(0,255,100,'+(0.15+Math.sin(Date.now()/600+i)*0.1)+')';ctx.fillRect(50+i*110,(H-150)+Math.sin(i*2.3)*20,6,6)}}
+  ctx.fillStyle='#2a1a2e';ctx.fillRect(0,H-120,W,120);ctx.fillStyle='#3a2a3e';ctx.fillRect(0,H-120,W,3);
+  game.characters.forEach((c,i)=>{
+    const x=60+i*160,y=H-200;
+    if(isAlive(i)){const gc={0:'#00E436',1:'#29ADFF',2:'#FFEC27'};const p=Math.sin(Date.now()/400+i)*0.12+0.12;ctx.fillStyle=gc[i]+Math.floor(p*255).toString(16).padStart(2,'0');ctx.beginPath();ctx.arc(x,y-24,30,0,Math.PI*2);ctx.fill()}
+    const sp=S[c.sprite];if(sp)drawSprite(sp,x-24,y-48,4);
+    if(!isAlive(i)){ctx.fillStyle='rgba(255,0,0,0.4)';ctx.fillRect(x-30,y-60,60,80);ctx.fillStyle='#e74c3c';ctx.font='bold 16px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('阵亡',x,y-10)}
+    ctx.fillStyle=isAlive(i)?c.color:'#666';ctx.font='bold 14px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText(c.name,x,y-60);
+    const hpW=100,hpH=10;ctx.fillStyle='#333';ctx.fillRect(x-hpW/2,y+20,hpW,hpH);
+    ctx.fillStyle=isAlive(i)?c.color:'#555';ctx.fillRect(x-hpW/2,y+20,hpW*(c.hp/c.maxHp),hpH);
+    ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.strokeRect(x-hpW/2,y+20,hpW,hpH);
+    ctx.fillStyle='#fff';ctx.font='9px "ZCOOL KuaiLe","SimHei"';ctx.fillText('HP:'+c.hp+'/'+c.maxHp,x,y+42);
+    if(game.itemShield>0&&isAlive(i)){ctx.fillStyle='#6495ed';ctx.fillText('🛡'+game.itemShield,x,y+54)}
+  });
+  if(game.monster){
+    const mx=620,my=H-220;
+    const ms={shibie:S.shibie,jinpo:S.jinpo,haihouzi:S.haihouzi,renmian:S.renmian,youyan:S.youyan,shibieKing:S.shibieKing,wannuwang:S.wannuwang,bronzeGuard:S.bronzeGuard,zhujiuyin:S.zhujiuyin,jiguanshe:S.jiguanshe,miluotuo:S.miluotuo};
+    const sp=ms[LEVELS[game.currentLevel].monster];if(sp){
+      // 怪物受击闪白
+      if(game.monsterFlash>0){ctx.globalAlpha=0.7+Math.sin(game.monsterFlash*2)*0.3;ctx.fillStyle='#fff';ctx.fillRect(mx-55,my-90,110,120);ctx.globalAlpha=1}
+      drawSprite(sp,mx-48,my-64,5);
+    }
+    ctx.fillStyle='#e74c3c';ctx.font='bold 16px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText(game.monster.name,mx,my-80);
+    if(zhangCountersMonster()){ctx.fillStyle='#29ADFF';ctx.font='11px "ZCOOL KuaiLe","SimHei"';ctx.fillText('🩸麒麟血克制中',mx,my-96)}
+    const hpW=160,hpH=14;ctx.fillStyle='#333';ctx.fillRect(mx-hpW/2,my+30,hpW,hpH);
+    ctx.fillStyle='#e74c3c';ctx.fillRect(mx-hpW/2,my+30,hpW*(game.monster.hp/game.monster.maxHp),hpH);
+    ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.strokeRect(mx-hpW/2,my+30,hpW,hpH);
+    ctx.fillStyle='#fff';ctx.font='12px "ZCOOL KuaiLe","SimHei"';ctx.fillText('HP:'+game.monster.hp+'/'+game.monster.maxHp,mx,my+58);
+    if(game.monsterDefDebuff>0){ctx.fillStyle='#00E436';ctx.font='11px "ZCOOL KuaiLe","SimHei"';ctx.fillText('防御↓'+game.monsterDefDebuff+'回合',mx,my+74)}
+  }
+  ctx.fillStyle='rgba(0,0,0,0.85)';ctx.fillRect(20,60,435,125);
+  ctx.fillStyle='#ecf0f1';ctx.font='12px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='left';
+  // 战斗日志自动换行
+  game.battleLog.forEach((log,i)=>{
+    const maxW=420,ly=82+i*18;
+    if(ctx.measureText(log).width>maxW){
+      let line='',yOff=0;
+      for(let j=0;j<log.length;j++){
+        const test=line+log[j];
+        if(ctx.measureText(test).width>maxW&&line.length>0){ctx.fillText(line,30,ly+yOff);line=log[j];yOff+=16}
+        else line=test;
+      }
+      if(line)ctx.fillText(line,30,ly+yOff);
+    }else ctx.fillText(log,30,ly);
+  });
+  ctx.fillStyle='#e2b04a';ctx.textAlign='right';ctx.font='12px "ZCOOL KuaiLe","SimHei"';
+  ctx.fillText('回合 '+(game.battleTurn+1),W-30,50);
+  if(game.battlePhase==='player')ctx.fillText('👈 你的回合',W-30,68);
+  else if(game.battlePhase==='monster')ctx.fillText('👉 敌人回合',W-30,68);
+  if(game.critBuff>0){ctx.fillStyle='#00E436';ctx.fillText('暴击↑'+game.critBuff+'回合',W-30,86)}
+  const alives=aliveChars();if(alives.length<3){ctx.fillStyle='#e74c3c';ctx.fillText('存活:'+alives.length+'/3人',W-30,104)}
+  if(game.itemShield>0){ctx.fillStyle='#6495ed';ctx.fillText('护盾:'+game.itemShield,W-30,122)}
+}
+function drawTitle(){
+  ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,W,H);
+  for(let i=0;i<60;i++){const sx=(i*137+50)%W,sy=(i*97+30)%(H-100),tw=Math.sin(Date.now()/1000+i)*0.5+0.5;ctx.fillStyle='rgba(255,255,255,'+(0.3+tw*0.7)+')';ctx.fillRect(sx,sy,2,2)}
+  ctx.fillStyle='#000';ctx.font='bold 52px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('盗墓笔记',W/2+3,153);
+  ctx.fillStyle='#e2b04a';ctx.fillText('盗墓笔记',W/2,150);
+  ctx.fillStyle='#ecf0f1';ctx.font='22px "ZCOOL KuaiLe","SimHei"';ctx.fillText('像素闯关 · 铁三角的冒险',W/2,195);
+  ctx.strokeStyle='#8b6914';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2-200,215);ctx.lineTo(W/2+200,215);ctx.stroke();
+  drawSprite(S.wuxie,W/2-80,260,5);drawSprite(S.zhang,W/2-20,260,5);drawSprite(S.wang,W/2+35,260,5);
+  ctx.fillStyle='#00E436';ctx.font='14px "ZCOOL KuaiLe","SimHei"';ctx.fillText('吴邪',W/2-65,320);
+  ctx.fillStyle='#29ADFF';ctx.font='14px "ZCOOL KuaiLe","SimHei"';ctx.fillText('张起灵',W/2-5,320);
+  ctx.fillStyle='#FFEC27';ctx.font='14px "ZCOOL KuaiLe","SimHei"';ctx.fillText('王胖子',W/2+65,320);
+  const a=Math.sin(Date.now()/800)*0.4+0.6;ctx.fillStyle='rgba(226,176,74,'+a+')';ctx.font='20px "ZCOOL KuaiLe","SimHei"';ctx.fillText('按 ENTER 开始冒险',W/2,400);
+  ctx.fillStyle='#666';ctx.font='13px "ZCOOL KuaiLe","SimHei"';ctx.fillText('8大关卡 | 贴合原著BOSS | 羁绊值加成 | 道具系统 | 触屏+存档',W/2,460);
+  // 存档提示
+  const hasSave=localStorage.getItem('daomu_save');
+  if(hasSave){ctx.fillStyle='rgba(78,255,78,0.7)';ctx.font='13px "ZCOOL KuaiLe","SimHei"';ctx.fillText('💾 检测到存档，按 C 键继续游戏',W/2,490)}
+  ctx.fillStyle='#666';ctx.font='11px "ZCOOL KuaiLe","SimHei"';ctx.fillText('按 ENTER 新游戏 | 按 C 继续游戏',W/2,508);
+}
+function drawEnding(){
+  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+  for(let i=0;i<40;i++){const sx=(i*173+20)%W,sy=(i*89+H*0.3)%H,ss=2+Math.random()*3;ctx.fillStyle='rgba(255,255,255,'+(0.3+Math.random()*0.4)+')';ctx.fillRect(sx,sy,ss,ss)}
+  ctx.fillStyle='#2c3e50';ctx.beginPath();ctx.moveTo(0,H);ctx.lineTo(0,H*0.5);ctx.lineTo(150,H*0.3);ctx.lineTo(300,H*0.45);ctx.lineTo(450,H*0.25);ctx.lineTo(600,H*0.4);ctx.lineTo(750,H*0.2);ctx.lineTo(W,H*0.35);ctx.lineTo(W,H);ctx.fill();
+  ctx.fillStyle='#ecf0f1';ctx.beginPath();ctx.moveTo(0,H*0.5);ctx.lineTo(150,H*0.3);ctx.lineTo(300,H*0.45);ctx.lineTo(450,H*0.25);ctx.lineTo(600,H*0.4);ctx.lineTo(750,H*0.2);ctx.lineTo(W,H*0.35);ctx.fill();
+  const gx=W/2-80,gy=H*0.25,gw=160,gh=H*0.5,grad=ctx.createLinearGradient(gx,gy,gx+gw,gy);grad.addColorStop(0,'#8b6914');grad.addColorStop(0.3,'#e2b04a');grad.addColorStop(0.5,'#f0d060');grad.addColorStop(0.7,'#e2b04a');grad.addColorStop(1,'#8b6914');
+  ctx.fillStyle=grad;ctx.fillRect(gx,gy,gw,gh);ctx.strokeStyle='#4a3728';ctx.lineWidth=6;ctx.strokeRect(gx,gy,gw,gh);
+  ctx.strokeStyle='#6a4728';ctx.lineWidth=2;for(let i=0;i<5;i++){const ly=gy+30+i*50;ctx.beginPath();ctx.moveTo(gx+20,ly);ctx.lineTo(gx+gw-20,ly);ctx.stroke()}
+  ctx.strokeStyle='#4a3728';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(gx+gw/2,gy);ctx.lineTo(gx+gw/2,gy+gh);ctx.stroke();
+  ctx.fillStyle='#e2b04a';ctx.beginPath();ctx.arc(gx+gw/2-15,gy+gh/2,12,0,Math.PI*2);ctx.fill();ctx.arc(gx+gw/2+15,gy+gh/2,12,0,Math.PI*2);ctx.fill();
+  if(game.endingTimer>60&&game.endingTimer<180){const p=(game.endingTimer-60)/120,zx=W/2-120+p*100,zy=H*0.7;drawSprite(S.zhang,zx-20,zy-56,5);ctx.fillStyle='#29ADFF';ctx.font='13px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('张起灵',zx,zy+20)}
+  if(game.endingTimer>30){const wx=W/2-200,wy=H*0.75;drawSprite(S.wuxie,wx,wy-48,4);drawSprite(S.wang,wx+40,wy-48,4);ctx.fillStyle='#fff';ctx.font='12px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('吴邪 & 王胖子',wx+20,wy+20)}
+  if(game.endingTimer>200){ctx.fillStyle='rgba(236,240,241,'+Math.min(1,(game.endingTimer-200)/60)+')';ctx.font='bold 18px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText('"用我一生，换你十年天真无邪"',W/2,H*0.85);ctx.fillText('—— 张起灵',W/2,H*0.85+26)}
+}
+
+// ==================== 游戏循环 ====================
+function update(){
+  if(game.moving){game.moveProgress+=0.04;if(game.moveProgress>=1){game.moving=false;game.moveProgress=0}}
+  game.particles=game.particles.filter(p=>{p.life--;if(p.type==='spark'){p.x+=p.vx;p.y+=p.vy;p.vy+=0.1}if(p.type==='damage'){p.y+=p.vy;p.vy-=0.05}return p.life>0});
+  if(game.shakeAmount>0)game.shakeAmount*=0.85;if(game.shakeAmount<0.1)game.shakeAmount=0;
+  if(game.screenFlash.duration>0){game.screenFlash.duration--;game.screenFlash.alpha*=0.6}else{game.screenFlash.alpha=0}
+  if(game.monsterFlash>0)game.monsterFlash--;
+  if(game.state==='ending'){game.endingTimer++;if(game.endingTimer>300)document.getElementById('ending-overlay').style.display='flex'}
+}
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // 像素对齐的屏幕震动
+  let sx=0,sy=0;
+  if(game.shakeAmount>0){sx=Math.round((Math.random()-0.5)*game.shakeAmount*2);sy=Math.round((Math.random()-0.5)*game.shakeAmount*2)}
+  ctx.save();ctx.translate(sx,sy);
+  switch(game.state){case 'title':drawTitle();break;case 'map':case 'victory':drawMap();break;case 'story':drawMap();break;case 'battle':drawBattle();break;case 'ending':drawEnding();break}
+  // 像素粒子特效
+  game.particles.forEach(p=>{if(p.type==='spark'){ctx.fillStyle=p.color;ctx.globalAlpha=p.life/40;ctx.fillRect(Math.round(p.x),Math.round(p.y),p.size,p.size)}else if(p.type==='damage'){ctx.fillStyle=p.color;ctx.globalAlpha=p.life/60;ctx.font='bold 18px "ZCOOL KuaiLe","SimHei"';ctx.textAlign='center';ctx.fillText(p.text,Math.round(p.x),Math.round(p.y))}ctx.globalAlpha=1});
+  ctx.restore();
+  // 屏幕闪光特效
+  if(game.screenFlash.alpha>0.01){
+    const sf=document.getElementById('screen-flash');
+    sf.style.background=game.screenFlash.color;
+    sf.style.opacity=game.screenFlash.alpha;
+  }else{document.getElementById('screen-flash').style.opacity='0'}
+}
+function gameLoop(){update();render();requestAnimationFrame(gameLoop)}
+
+// ==================== 加载流程 ====================
+function showLoading(percent,text){
+  document.getElementById('load-bar').style.width=percent+'%';
+  if(text)document.getElementById('load-status').textContent=text;
+}
+function finishLoading(){
+  document.getElementById('loading-screen').style.display='none';
+  game.loaded=true;
+  if(loadGame()){
+    setTimeout(()=>{showToast('💾 存档已加载！从第'+(game.unlockedLevel+1)+'关继续')},500);
+  }
+  updateUI();
+}
+
+function waitForEnterToStart(){
+  var handler=function(e){
+    if(e.key==='Enter'||e.key===' '){
+      window.removeEventListener('keydown',handler);
+      var btn=document.getElementById('load-enter-btn');if(btn)btn.remove();
+      finishLoading();
+    }
+  };
+  window.addEventListener('keydown',handler);
+  var btn=document.createElement('button');
+  btn.id='load-enter-btn';
+  btn.textContent='▶ 进入游戏';
+  btn.onclick=function(){
+    window.removeEventListener('keydown',handler);
+    btn.remove();
+    finishLoading();
+  };
+  btn.style.cssText='margin-top:16px;padding:10px 32px;font-size:18px;font-family:inherit;background:#e2b04a;color:#000;border:none;cursor:pointer;font-weight:bold;pointer-events:auto';
+  document.getElementById('loading-screen').appendChild(btn);
+}
+
+// ==================== 初始化 ====================
+function restartGame(){
+  game.state='title';game.currentLevel=0;game.unlockedLevel=0;game.intimacy=0;game.playerNode=0;game.moving=false;
+  game.characters=JSON.parse(JSON.stringify(CHARS));game.deadChars=[false,false,false];
+  game.monster=null;game.battleTurn=0;game.defending=false;game.particles=[];game.shakeAmount=0;
+  game.storyIndex=0;game.battleLog=[];game.battlePhase='player';game.inputLocked=false;
+  game.skillCooldown={qilin:0,bomb:0,crack:0};game.comboUnlocked=false;
+  game.endingTimer=0;game.cachedTerrain=null;game.showedSkillPanel=false;game.monsterDefDebuff=0;game.critBuff=0;
+  game.items={heal:0,atkBoost:0,shield:0};game.itemAtkBoost=0;game.itemShield=0;
+  game.screenFlash={color:'#fff',alpha:0,duration:0};game.monsterFlash=0;game.tutorialShown=false;
+  document.getElementById('battle-panel').style.display='none';document.getElementById('dialogue-box').style.display='none';
+  document.getElementById('ending-overlay').style.display='none';document.getElementById('skill-popup').style.display='none';
+  document.getElementById('skill-overview').style.display='none';document.getElementById('item-bar').style.display='none';
+  document.getElementById('buff-indicator').style.display='none';
+  if(isMobile)document.getElementById('touch-battle').style.display='none';
+  updateUI();document.getElementById('level-name').textContent='山东瓜子庙';
+}
+
+function init(){
+  updateUI();
+  document.getElementById('battle-panel').style.display='none';document.getElementById('dialogue-box').style.display='none';
+  document.getElementById('ending-overlay').style.display='none';document.getElementById('skill-popup').style.display='none';
+  document.getElementById('skill-overview').style.display='none';document.getElementById('item-bar').style.display='none';
+  document.getElementById('buff-indicator').style.display='none';
+  if(isMobile)document.getElementById('touch-battle').style.display='none';
+  game.cachedTerrain=genTerrain();
+  gameLoop();
+  showLoading(25,'加载像素精灵...');
+  setTimeout(function(){
+    showLoading(60,'生成地图地形...');
+    setTimeout(function(){
+      showLoading(85,'初始化战斗系统...');
+      setTimeout(function(){
+        showLoading(100,'按 Enter 键进入游戏');
+        waitForEnterToStart();
+      },150);
+    },150);
+  },200);
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+else{init();}
+console.log('🎮 盗墓笔记 像素闯关 v2 - 移动端+存档+特效');
+console.log('📱 触屏适配 | 💾 自动存档 | 🎬 像素战斗特效 | 📖 新手引导');
+console.log('人设：张起灵(HP250 ATK50) | 王胖子(HP200 ATK35) | 吴邪(HP120 ATK12 辅助+输出)');
+</script>
+</body>
+</html>
